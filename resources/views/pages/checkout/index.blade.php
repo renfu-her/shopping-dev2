@@ -83,51 +83,6 @@
                                     <i class="fas fa-university me-2"></i>Bank Transfer
                                 </label>
                             </div>
-                            
-                            <!-- Credit Card Fields -->
-                            <div id="credit-card-fields">
-                                <div class="row">
-                                    <div class="col-12">
-                                        <div class="mb-3">
-                                            <label for="card_number" class="form-label">Card Number</label>
-                                            <input type="text" class="form-control" id="card_number" name="card_number" placeholder="1234 5678 9012 3456" maxlength="19">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="card_expiry" class="form-label">Expiry Date</label>
-                                            <input type="text" class="form-control" id="card_expiry" name="card_expiry" placeholder="MM/YY" maxlength="5">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label for="card_cvv" class="form-label">CVV</label>
-                                            <input type="text" class="form-control" id="card_cvv" name="card_cvv" placeholder="123" maxlength="4">
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-12">
-                                        <div class="mb-3">
-                                            <label for="card_holder" class="form-label">Cardholder Name</label>
-                                            <input type="text" class="form-control" id="card_holder" name="card_holder" placeholder="Name on card">
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Bank Transfer Fields -->
-                            <div id="bank-transfer-fields" style="display: none;">
-                                <div class="alert alert-info">
-                                    <h6>Bank Transfer Details</h6>
-                                    <p class="mb-1"><strong>Bank:</strong> Example Bank</p>
-                                    <p class="mb-1"><strong>Account Number:</strong> 1234-5678-9012-3456</p>
-                                    <p class="mb-1"><strong>Account Name:</strong> Your Store Name</p>
-                                    <p class="mb-0"><strong>Reference:</strong> Please use your order number as reference</p>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- Order Notes -->
@@ -149,7 +104,62 @@
                     <h5 class="mb-0">Order Summary</h5>
                 </div>
                 <div class="card-body">
-                    @include('components.cart-summary')
+
+                    <!-- Cart Items -->
+                    <div class="mb-3">
+                        @foreach($cartItems as $item)
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="flex-shrink-0 me-3">
+                                    @if($item->product->primaryImage)
+                                        <img src="{{ asset('storage/' . $item->product->primaryImage->image_path) }}" 
+                                             class="img-fluid rounded" 
+                                             alt="{{ $item->product->name }}"
+                                             style="width: 60px; height: 60px; object-fit: cover;">
+                                    @else
+                                        <div class="bg-light rounded d-flex align-items-center justify-content-center" 
+                                             style="width: 60px; height: 60px;">
+                                            <i class="fas fa-image text-muted"></i>
+                                        </div>
+                                    @endif
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">{{ $item->product->name }}</h6>
+                                    <small class="text-muted">Qty: {{ $item->quantity }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <strong>${{ number_format($item->price * $item->quantity, 2) }}</strong>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <hr>
+
+                    <!-- Totals -->
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal:</span>
+                        <span>${{ number_format($subtotal, 2) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tax (5%):</span>
+                        <span>${{ number_format($tax, 2) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Shipping:</span>
+                        <span>${{ number_format($shipping, 2) }}</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-3">
+                        <strong>Total:</strong>
+                        <strong class="text-primary">${{ number_format($total, 2) }}</strong>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="fas fa-info-circle me-1"></i>
+                            All prices include tax. Free shipping on all orders.
+                        </small>
+                    </div>
                 </div>
             </div>
         </div>
@@ -191,43 +201,14 @@ document.addEventListener('DOMContentLoaded', function() {
         if (creditCardRadio.checked) {
             creditCardFields.style.display = 'block';
             bankTransferFields.style.display = 'none';
-            creditCardInputs.forEach(input => input.setAttribute('required', 'required'));
-            bankTransferInputs.forEach(input => input.removeAttribute('required'));
         } else {
             creditCardFields.style.display = 'none';
             bankTransferFields.style.display = 'block';
-            creditCardInputs.forEach(input => input.removeAttribute('required'));
-            bankTransferInputs.forEach(input => input.removeAttribute('required'));
         }
     }
 
     creditCardRadio.addEventListener('change', togglePaymentFields);
     bankTransferRadio.addEventListener('change', togglePaymentFields);
-
-    // Card number formatting
-    const cardNumberInput = document.getElementById('card_number');
-    cardNumberInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-        let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
-        e.target.value = formattedValue;
-    });
-
-    // Expiry date formatting
-    const cardExpiryInput = document.getElementById('card_expiry');
-    cardExpiryInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-        if (value.length >= 2) {
-            value = value.substring(0, 2) + '/' + value.substring(2, 4);
-        }
-        e.target.value = value;
-    });
-
-    // CVV validation
-    const cardCvvInput = document.getElementById('card_cvv');
-    cardCvvInput.addEventListener('input', function(e) {
-        let value = e.target.value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-        e.target.value = value;
-    });
 
     // Initialize payment fields
     togglePaymentFields();
