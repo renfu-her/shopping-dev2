@@ -3570,3 +3570,450 @@ public function table(Table $table): Table
 
 
 記住，Filament 是一個活躍的開源項目，定期會有更新和新功能。建議定期查看官方文檔以獲取最新信息。
+
+### 27. 導航系統 (Navigation System)
+
+#### 27.1 概述
+**導航系統功能：**
+- 默認情況下，Filament 會為每個資源、自定義頁面和集群註冊導航項目
+- 這些類包含靜態屬性和方法，您可以覆蓋它們來配置導航項目
+- 如果您想為應用程序添加第二層導航，可以使用集群來將資源和頁面分組在一起
+
+#### 27.2 自定義導航項目標籤
+
+**自定義導航標籤：**
+```php
+protected static ?string $navigationLabel = 'Custom Navigation Label';
+```
+
+**動態標籤：**
+```php
+public static function getNavigationLabel(): string
+{
+    return __('navigation.users');
+}
+```
+
+#### 27.3 自定義導航項目圖標
+
+**設置導航圖標：**
+```php
+protected static ?string $navigationIcon = 'heroicon-o-users';
+```
+
+**動態圖標：**
+```php
+public static function getNavigationIcon(): ?string
+{
+    return 'heroicon-o-users';
+}
+```
+
+**當導航項目處於活動狀態時切換圖標：**
+```php
+protected static ?string $navigationActiveIcon = 'heroicon-o-users';
+```
+
+#### 27.4 排序導航項目
+
+**設置導航排序：**
+```php
+protected static ?int $navigationSort = 1;
+```
+
+**動態排序：**
+```php
+public static function getNavigationSort(): ?int
+{
+    return 1;
+}
+```
+
+#### 27.5 為導航項目添加徽章
+
+**添加徽章：**
+```php
+protected static ?string $navigationBadge = 'New';
+```
+
+**動態徽章：**
+```php
+public static function getNavigationBadge(): ?string
+{
+    return User::count();
+}
+```
+
+**徽章顏色：**
+```php
+protected static ?string $navigationBadgeColor = 'success';
+```
+
+**徽章工具提示：**
+```php
+protected static ?string $navigationBadgeTooltip = 'New users this week';
+```
+
+#### 27.6 分組導航項目
+
+**使用導航組：**
+```php
+protected static ?string $navigationGroup = 'User Management';
+```
+
+**動態分組：**
+```php
+public static function getNavigationGroup(): ?string
+{
+    return __('navigation.user_management');
+}
+```
+
+**在導航組下分組其他項目：**
+```php
+protected static ?string $navigationParentItem = 'settings';
+```
+
+**自定義導航組：**
+```php
+use Filament\Navigation\NavigationGroup;
+
+NavigationGroup::make('Website')
+    ->icon('heroicon-o-globe-alt')
+    ->collapsed();
+```
+
+**使用枚舉註冊導航組：**
+```php
+enum NavigationGroup: string
+{
+    case Website = 'website';
+    case Settings = 'settings';
+}
+
+// 在資源中使用
+protected static ?string $navigationGroup = NavigationGroup::Website->value;
+```
+
+#### 27.7 桌面上的可折疊側邊欄
+
+**啟用桌面折疊：**
+```php
+use Filament\Panel;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->sidebarCollapsibleOnDesktop();
+}
+```
+
+**桌面可折疊側邊欄中的導航組：**
+```php
+NavigationGroup::make('Website')
+    ->collapsed();
+```
+
+#### 27.8 註冊自定義導航項目
+
+**創建自定義導航項目：**
+```php
+use Filament\Navigation\NavigationItem;
+
+NavigationItem::make('Analytics')
+    ->url('https://filament.pirsch.io', shouldOpenInNewTab: true)
+    ->icon('heroicon-o-presentation-chart-line')
+    ->group('Reports')
+    ->sort(3);
+```
+
+**動態導航項目：**
+```php
+NavigationItem::make('dashboard')
+    ->label(fn (): string => __('filament-panels::pages/dashboard.title'))
+    ->url(fn (): string => Dashboard::getUrl())
+    ->isActiveWhen(fn () => original_request()->routeIs('filament.admin.pages.dashboard'));
+```
+
+#### 27.9 條件性隱藏導航項目
+
+**基於條件隱藏導航項目：**
+```php
+use Filament\Navigation\NavigationItem;
+
+NavigationItem::make('Analytics')
+    ->visible(fn(): bool => auth()->user()->can('view-analytics'))
+    // 或者
+    ->hidden(fn(): bool => ! auth()->user()->can('view-analytics'));
+```
+
+#### 27.10 禁用資源或頁面導航項目
+
+**防止資源或頁面顯示在導航中：**
+```php
+protected static bool $shouldRegisterNavigation = false;
+```
+
+**或者覆蓋方法：**
+```php
+public static function shouldRegisterNavigation(): bool
+{
+    return false;
+}
+```
+
+#### 27.11 使用頂部導航
+
+**配置頂部導航：**
+```php
+use Filament\Panel;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->topNavigation();
+}
+```
+
+#### 27.12 自定義側邊欄寬度
+
+**設置側邊欄寬度：**
+```php
+use Filament\Panel;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->sidebarWidth('40rem');
+}
+```
+
+**自定義折疊圖標寬度：**
+```php
+use Filament\Panel;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->sidebarCollapsibleOnDesktop()
+        ->collapsedSidebarWidth('9rem');
+}
+```
+
+#### 27.13 高級導航自定義
+
+**構建自定義導航：**
+```php
+use App\Filament\Pages\Settings;
+use App\Filament\Resources\Users\UserResource;
+use Filament\Navigation\NavigationBuilder;
+use Filament\Navigation\NavigationItem;
+use Filament\Pages\Dashboard;
+use Filament\Panel;
+use function Filament\Support\original_request;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->navigation(function (NavigationBuilder $builder): NavigationBuilder {
+            return $builder->items([
+                NavigationItem::make('Dashboard')
+                    ->icon('heroicon-o-home')
+                    ->isActiveWhen(fn (): bool => original_request()->routeIs('filament.admin.pages.dashboard'))
+                    ->url(fn (): string => Dashboard::getUrl()),
+                ...UserResource::getNavigationItems(),
+                ...Settings::getNavigationItems(),
+            ]);
+        });
+}
+```
+
+**註冊自定義導航組：**
+```php
+use App\Filament\Pages\HomePageSettings;
+use App\Filament\Resources\Categories\CategoryResource;
+use App\Filament\Resources\Pages\PageResource;
+use Filament\Navigation\NavigationBuilder;
+use Filament\Navigation\NavigationGroup;
+use Filament\Panel;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->navigation(function (NavigationBuilder $builder): NavigationBuilder {
+            return $builder->groups([
+                NavigationGroup::make('Website')
+                    ->items([
+                        ...PageResource::getNavigationItems(),
+                        ...CategoryResource::getNavigationItems(),
+                        ...HomePageSettings::getNavigationItems(),
+                    ]),
+            ]);
+        });
+}
+```
+
+#### 27.14 禁用導航
+
+**完全禁用導航：**
+```php
+use Filament\Panel;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->navigation(false);
+}
+```
+
+#### 27.15 禁用頂部欄
+
+**禁用頂部欄：**
+```php
+use Filament\Panel;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->topbar(false);
+}
+```
+
+#### 27.16 替換側邊欄和頂部欄 Livewire 組件
+
+**使用自定義組件：**
+```php
+use App\Livewire\Sidebar;
+use App\Livewire\Topbar;
+use Filament\Panel;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->sidebarLivewireComponent(Sidebar::class)
+        ->topbarLivewireComponent(Topbar::class);
+}
+```
+
+#### 27.17 禁用麵包屑
+
+**禁用麵包屑：**
+```php
+use Filament\Panel;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->breadcrumbs(false);
+}
+```
+
+#### 27.18 重新加載側邊欄和頂部欄
+
+**從 PHP 調度事件：**
+```php
+// 在任何 Livewire 組件中
+$this->dispatch('refresh-sidebar');
+
+// 在自定義操作中
+use Filament\Actions\Action;
+use Livewire\Component;
+
+Action::make('create')
+    ->action(function (Component $livewire) {
+        // ...
+    
+        $livewire->dispatch('refresh-sidebar');
+    });
+```
+
+**從 JavaScript 調度事件：**
+```html
+<!-- 使用 Alpine.js -->
+<button x-on:click="$dispatch('refresh-sidebar')" type="button">
+    Refresh Sidebar
+</button>
+
+<!-- 使用原生 JavaScript -->
+<script>
+window.dispatchEvent(new CustomEvent('refresh-sidebar'));
+</script>
+```
+
+#### 27.19 導航最佳實踐
+
+##### 27.19.1 組織原則
+- **邏輯分組**: 將相關功能組織在一起
+- **層次結構**: 使用適當的層次結構來組織導航
+- **一致性**: 保持導航標籤和圖標的一致性
+- **簡潔性**: 避免過多的導航項目
+
+##### 27.19.2 用戶體驗
+- **清晰的標籤**: 使用描述性的導航標籤
+- **適當的圖標**: 選擇有意義的圖標
+- **視覺反饋**: 提供適當的活動狀態指示
+- **響應式設計**: 確保在移動設備上的可用性
+
+##### 27.19.3 性能考慮
+- **條件渲染**: 合理使用條件顯示
+- **權限控制**: 基於用戶權限顯示導航項目
+- **緩存策略**: 考慮導航項目的緩存
+
+##### 27.19.4 可訪問性
+- **鍵盤導航**: 確保可以通過鍵盤訪問所有導航項目
+- **屏幕閱讀器**: 提供適當的 ARIA 標籤
+- **顏色對比**: 確保足夠的顏色對比度
+- **焦點管理**: 正確管理焦點狀態
+
+#### 27.20 導航配置示例
+
+**完整的導航配置示例：**
+```php
+use Filament\Panel;
+use Filament\Navigation\NavigationBuilder;
+use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
+
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->navigation(function (NavigationBuilder $builder): NavigationBuilder {
+            return $builder
+                ->groups([
+                    NavigationGroup::make('Content Management')
+                        ->icon('heroicon-o-document-text')
+                        ->items([
+                            ...PageResource::getNavigationItems(),
+                            ...PostResource::getNavigationItems(),
+                            ...CategoryResource::getNavigationItems(),
+                        ]),
+                    NavigationGroup::make('User Management')
+                        ->icon('heroicon-o-users')
+                        ->items([
+                            ...UserResource::getNavigationItems(),
+                            ...RoleResource::getNavigationItems(),
+                        ]),
+                    NavigationGroup::make('Settings')
+                        ->icon('heroicon-o-cog-6-tooth')
+                        ->items([
+                            ...Settings::getNavigationItems(),
+                        ]),
+                ])
+                ->items([
+                    NavigationItem::make('Analytics')
+                        ->url('https://analytics.example.com')
+                        ->icon('heroicon-o-chart-bar')
+                        ->group('Reports')
+                        ->visible(fn(): bool => auth()->user()->can('view-analytics')),
+                ]);
+        })
+        ->sidebarCollapsibleOnDesktop()
+        ->sidebarWidth('20rem')
+        ->collapsedSidebarWidth('5rem');
+}
+```
+
+這個導航系統提供了強大的自定義能力，讓您可以創建直觀且用戶友好的管理界面導航結構。
+
+
+記住，Filament 是一個活躍的開源項目，定期會有更新和新功能。建議定期查看官方文檔以獲取最新信息。
