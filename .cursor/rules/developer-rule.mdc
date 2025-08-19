@@ -1,0 +1,1559 @@
+---
+alwaysApply: true
+---
+# E-Commerce System Development Plan
+
+## 🎯 Project Overview
+
+**Technology Stack:**
+- **Backend:** Laravel 12 + Filament v4
+- **Frontend:** Bootstrap 5 + jQuery
+- **Payment Gateway:** ECPay (綠界金流)
+- **Authentication:** Multi-guard (Admin + Member)
+
+**Core Features:**
+- Product management with multi-level categories
+- Shopping cart functionality
+- Checkout process with ECPay integration
+- Member authentication system
+- Admin panel with Filament v4
+
+---
+
+## 📋 Development Phases
+
+### Phase 1: Database Structure & Models
+### Phase 2: Authentication System (Member + Admin)
+### Phase 3: Product & Category Management
+### Phase 4: Shopping Cart System
+### Phase 5: Checkout & Payment Integration
+### Phase 6: Frontend Development
+### Phase 7: Filament v4 Admin Panel
+### Phase 8: Testing & Optimization
+
+---
+
+## 🗄️ Database Structure
+
+### 1.1 Core Tables
+
+#### Members Table
+```sql
+CREATE TABLE members (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NULL,
+    address TEXT NULL,
+    email_verified_at TIMESTAMP NULL,
+    remember_token VARCHAR(100) NULL,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL
+);
+```
+
+#### Categories Table (Multi-level)
+```sql
+CREATE TABLE categories (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT NULL,
+    parent_id BIGINT UNSIGNED NULL,
+    sort_order INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    meta_title VARCHAR(255) NULL,
+    meta_description TEXT NULL,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE
+);
+```
+
+#### Products Table
+```sql
+CREATE TABLE products (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(255) UNIQUE NOT NULL,
+    description TEXT NULL,
+    short_description TEXT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    sale_price DECIMAL(10,2) NULL,
+    cost_price DECIMAL(10,2) NULL,
+    sku VARCHAR(100) UNIQUE NULL,
+    stock_quantity INT DEFAULT 0,
+    weight DECIMAL(8,2) NULL,
+    dimensions VARCHAR(100) NULL,
+    category_id BIGINT UNSIGNED NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    is_featured BOOLEAN DEFAULT FALSE,
+    meta_title VARCHAR(255) NULL,
+    meta_description TEXT NULL,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (category_id) REFERENCES categories(id)
+);
+```
+
+#### Product Images Table
+```sql
+CREATE TABLE product_images (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    product_id BIGINT UNSIGNED NOT NULL,
+    image_path VARCHAR(500) NOT NULL,
+    alt_text VARCHAR(255) NULL,
+    sort_order INT DEFAULT 0,
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+```
+
+#### Cart Items Table
+```sql
+CREATE TABLE cart_items (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(255) NOT NULL,
+    member_id BIGINT UNSIGNED NULL,
+    product_id BIGINT UNSIGNED NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    price DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+);
+```
+
+#### Orders Table
+```sql
+CREATE TABLE orders (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_number VARCHAR(50) UNIQUE NOT NULL,
+    member_id BIGINT UNSIGNED NOT NULL,
+    status ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
+    payment_status ENUM('pending', 'paid', 'failed', 'refunded') DEFAULT 'pending',
+    payment_method VARCHAR(50) NULL,
+    subtotal DECIMAL(10,2) NOT NULL,
+    tax_amount DECIMAL(10,2) DEFAULT 0,
+    shipping_amount DECIMAL(10,2) DEFAULT 0,
+    total_amount DECIMAL(10,2) NOT NULL,
+    shipping_address TEXT NOT NULL,
+    billing_address TEXT NOT NULL,
+    notes TEXT NULL,
+    ecpay_merchant_trade_no VARCHAR(50) NULL,
+    ecpay_payment_date TIMESTAMP NULL,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (member_id) REFERENCES members(id)
+);
+```
+
+#### Order Items Table
+```sql
+CREATE TABLE order_items (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    order_id BIGINT UNSIGNED NOT NULL,
+    product_id BIGINT UNSIGNED NOT NULL,
+    product_name VARCHAR(255) NOT NULL,
+    product_sku VARCHAR(100) NULL,
+    quantity INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    total_price DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id)
+);
+```
+
+---
+
+## 🔐 Authentication System
+
+### 2.1 Multi-Guard Configuration
+
+#### Update config/auth.php
+```php
+<?php
+
+return [
+    'defaults' => [
+        'guard' => env('AUTH_GUARD', 'web'),
+        'passwords' => env('AUTH_PASSWORD_BROKER', 'users'),
+    ],
+
+    'guards' => [
+        'web' => [
+            'driver' => 'session',
+            'provider' => 'users',
+        ],
+        'member' => [
+            'driver' => 'session',
+            'provider' => 'members',
+        ],
+    ],
+
+    'providers' => [
+        'users' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\User::class,
+        ],
+        'members' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Member::class,
+        ],
+    ],
+
+    'passwords' => [
+        'users' => [
+            'provider' => 'users',
+            'table' => 'password_reset_tokens',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+        'members' => [
+            'provider' => 'members',
+            'table' => 'member_password_reset_tokens',
+            'expire' => 60,
+            'throttle' => 60,
+        ],
+    ],
+
+    'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
+];
+```
+
+### 2.2 Models
+
+#### Member Model
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
+
+class Member extends Authenticatable
+{
+    use HasApiTokens, HasFactory, Notifiable;
+
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+        'phone',
+        'address',
+    ];
+
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
+
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+    ];
+
+    // Relationships
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function cartItems()
+    {
+        return $this->hasMany(CartItem::class);
+    }
+}
+```
+
+#### Category Model
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Category extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'name',
+        'slug',
+        'description',
+        'parent_id',
+        'sort_order',
+        'is_active',
+        'meta_title',
+        'meta_description',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
+
+    // Relationships
+    public function parent()
+    {
+        return $this->belongsTo(Category::class, 'parent_id');
+    }
+
+    public function children()
+    {
+        return $this->hasMany(Category::class, 'parent_id');
+    }
+
+    public function products()
+    {
+        return $this->hasMany(Product::class);
+    }
+
+    // Scopes
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeRoot($query)
+    {
+        return $query->whereNull('parent_id');
+    }
+}
+```
+
+#### Product Model
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Product extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'name',
+        'slug',
+        'description',
+        'short_description',
+        'price',
+        'sale_price',
+        'cost_price',
+        'sku',
+        'stock_quantity',
+        'weight',
+        'dimensions',
+        'category_id',
+        'is_active',
+        'is_featured',
+        'meta_title',
+        'meta_description',
+    ];
+
+    protected $casts = [
+        'price' => 'decimal:2',
+        'sale_price' => 'decimal:2',
+        'cost_price' => 'decimal:2',
+        'weight' => 'decimal:2',
+        'is_active' => 'boolean',
+        'is_featured' => 'boolean',
+    ];
+
+    // Relationships
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    public function images()
+    {
+        return $this->hasMany(ProductImage::class);
+    }
+
+    public function primaryImage()
+    {
+        return $this->hasOne(ProductImage::class)->where('is_primary', true);
+    }
+
+    // Scopes
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    public function scopeFeatured($query)
+    {
+        return $query->where('is_featured', true);
+    }
+
+    // Accessors
+    public function getFinalPriceAttribute()
+    {
+        return $this->sale_price ?? $this->price;
+    }
+
+    public function getDiscountPercentageAttribute()
+    {
+        if ($this->sale_price && $this->price > $this->sale_price) {
+            return round((($this->price - $this->sale_price) / $this->price) * 100);
+        }
+        return 0;
+    }
+}
+```
+
+---
+
+## 🛒 Shopping Cart System
+
+### 3.1 Cart Service
+```php
+<?php
+
+namespace App\Services;
+
+use App\Models\CartItem;
+use App\Models\Product;
+use Illuminate\Support\Str;
+
+class CartService
+{
+    public function addToCart($productId, $quantity = 1, $memberId = null)
+    {
+        $sessionId = session()->getId();
+        $product = Product::findOrFail($productId);
+
+        // Check if item already exists in cart
+        $cartItem = CartItem::where('session_id', $sessionId)
+            ->where('product_id', $productId)
+            ->when($memberId, fn($query) => $query->where('member_id', $memberId))
+            ->first();
+
+        if ($cartItem) {
+            $cartItem->update([
+                'quantity' => $cartItem->quantity + $quantity,
+                'price' => $product->final_price,
+            ]);
+        } else {
+            CartItem::create([
+                'session_id' => $sessionId,
+                'member_id' => $memberId,
+                'product_id' => $productId,
+                'quantity' => $quantity,
+                'price' => $product->final_price,
+            ]);
+        }
+
+        return $this->getCart($memberId);
+    }
+
+    public function getCart($memberId = null)
+    {
+        $sessionId = session()->getId();
+        
+        return CartItem::with('product')
+            ->where('session_id', $sessionId)
+            ->when($memberId, fn($query) => $query->where('member_id', $memberId))
+            ->get();
+    }
+
+    public function updateQuantity($cartItemId, $quantity)
+    {
+        $cartItem = CartItem::findOrFail($cartItemId);
+        $cartItem->update(['quantity' => $quantity]);
+        
+        return $this->getCart($cartItem->member_id);
+    }
+
+    public function removeFromCart($cartItemId)
+    {
+        $cartItem = CartItem::findOrFail($cartItemId);
+        $memberId = $cartItem->member_id;
+        $cartItem->delete();
+        
+        return $this->getCart($memberId);
+    }
+
+    public function getCartTotal($memberId = null)
+    {
+        $cartItems = $this->getCart($memberId);
+        return $cartItems->sum(function ($item) {
+            return $item->price * $item->quantity;
+        });
+    }
+
+    public function clearCart($memberId = null)
+    {
+        $sessionId = session()->getId();
+        
+        CartItem::where('session_id', $sessionId)
+            ->when($memberId, fn($query) => $query->where('member_id', $memberId))
+            ->delete();
+    }
+}
+```
+
+---
+
+## 💳 Payment Integration (ECPay)
+
+### 4.1 ECPay Service
+```php
+<?php
+
+namespace App\Services;
+
+use App\Models\Order;
+
+class ECPayService
+{
+    private $merchantId;
+    private $hashKey;
+    private $hashIV;
+    private $isProduction;
+
+    public function __construct()
+    {
+        $this->merchantId = config('ecpay.merchant_id');
+        $this->hashKey = config('ecpay.hash_key');
+        $this->hashIV = config('ecpay.hash_iv');
+        $this->isProduction = config('ecpay.production', false);
+    }
+
+    public function createPayment(Order $order)
+    {
+        $baseUrl = $this->isProduction 
+            ? 'https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5'
+            : 'https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5';
+
+        $data = [
+            'MerchantID' => $this->merchantId,
+            'MerchantTradeNo' => $order->order_number,
+            'MerchantTradeDate' => date('Y/m/d H:i:s'),
+            'PaymentType' => 'aio',
+            'TotalAmount' => (int)$order->total_amount,
+            'TradeDesc' => '商品購買',
+            'ItemName' => $this->formatItemNames($order),
+            'ReturnURL' => route('payment.return'),
+            'ClientBackURL' => route('orders.show', $order),
+            'OrderResultURL' => route('payment.result'),
+            'ChoosePayment' => 'ALL',
+            'EncryptType' => 1,
+        ];
+
+        $data['CheckMacValue'] = $this->generateCheckMacValue($data);
+
+        return [
+            'url' => $baseUrl,
+            'data' => $data,
+        ];
+    }
+
+    private function formatItemNames(Order $order)
+    {
+        return $order->items->map(function ($item) {
+            return $item->product_name . ' x' . $item->quantity;
+        })->implode('#');
+    }
+
+    private function generateCheckMacValue($data)
+    {
+        // Remove CheckMacValue if exists
+        unset($data['CheckMacValue']);
+
+        // Sort by key
+        ksort($data);
+
+        // Create query string
+        $queryString = http_build_query($data);
+
+        // Add hash key and IV
+        $queryString = 'HashKey=' . $this->hashKey . '&' . $queryString . '&HashIV=' . $this->hashIV;
+
+        // URL encode
+        $queryString = urlencode($queryString);
+
+        // Convert to lowercase
+        $queryString = strtolower($queryString);
+
+        // Generate SHA256 hash
+        return strtoupper(hash('sha256', $queryString));
+    }
+
+    public function verifyPayment($data)
+    {
+        $checkMacValue = $data['CheckMacValue'] ?? '';
+        unset($data['CheckMacValue']);
+
+        $expectedCheckMacValue = $this->generateCheckMacValue($data);
+
+        return $checkMacValue === $expectedCheckMacValue;
+    }
+}
+```
+
+---
+
+## 🎨 Frontend Structure
+
+### 5.1 Blade Templates Structure
+```
+resources/views/
+├── layouts/
+│   ├── app.blade.php          # Main layout
+│   └── guest.blade.php        # Guest layout
+├── components/
+│   ├── header.blade.php
+│   ├── footer.blade.php
+│   ├── product-card.blade.php
+│   └── cart-summary.blade.php
+├── pages/
+│   ├── home.blade.php
+│   ├── products/
+│   │   ├── index.blade.php
+│   │   ├── show.blade.php
+│   │   └── category.blade.php
+│   ├── cart/
+│   │   ├── index.blade.php
+│   │   └── checkout.blade.php
+│   ├── auth/
+│   │   ├── login.blade.php
+│   │   ├── register.blade.php
+│   │   └── profile.blade.php
+│   └── orders/
+│       ├── index.blade.php
+│       └── show.blade.php
+```
+
+### 5.2 Main Layout (app.blade.php)
+```html
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>@yield('title', 'E-Commerce Store')</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Custom CSS -->
+    <link href="{{ asset('css/app.css') }}" rel="stylesheet">
+    
+    @stack('styles')
+</head>
+<body>
+    @include('components.header')
+    
+    <main class="container-fluid">
+        @yield('content')
+    </main>
+    
+    @include('components.footer')
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="{{ asset('js/app.js') }}"></script>
+    
+    @stack('scripts')
+</body>
+</html>
+```
+
+---
+
+## ⚙️ Filament v4 Admin Panel
+
+### 6.1 Filament v4 Overview
+
+**Key Features:**
+- **Panel System**: Multi-panel support for different admin interfaces
+- **Livewire 3**: Complete rewrite based on Livewire 3 and Alpine.js
+- **Schema System**: Unified page structure for forms, infolists, and layouts
+- **Infolists**: New read-only display system for viewing records
+- **Enhanced Actions**: More powerful action system with modals and bulk operations
+- **Global Search**: Cross-resource unified search functionality
+- **Nested Resources**: Support for parent-child resource relationships
+
+### 6.2 Installation & Setup
+
+```bash
+# Install Filament v4
+composer require filament/filament:"^4.0"
+
+# Install with panels
+php artisan filament:install --panels
+
+# Create admin panel
+php artisan make:filament-panel admin
+
+# Create resources
+php artisan make:filament-resource Product
+php artisan make:filament-resource Category
+php artisan make:filament-resource Order
+php artisan make:filament-resource Member
+```
+
+### 6.3 Resource Structure
+
+#### Product Resource (v4 Syntax)
+```php
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Resources\ProductResource\Pages;
+use App\Models\Product;
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Support\Str;
+
+class ProductResource extends Resource
+{
+    protected static ?string $model = Product::class;
+    protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
+    protected static ?string $navigationGroup = 'Product Management';
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Forms\Components\Section::make('Basic Information')
+                    ->schema([
+                        Forms\Components\TextInput::make('name')
+                            ->required()
+                            ->maxLength(255)
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn ($state, $set) => $set('slug', Str::slug($state))),
+                        
+                        Forms\Components\TextInput::make('slug')
+                            ->required()
+                            ->maxLength(255)
+                            ->unique(ignoreRecord: true),
+                        
+                        Forms\Components\Select::make('category_id')
+                            ->relationship('category', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->required(),
+                        
+                        Forms\Components\TextInput::make('sku')
+                            ->maxLength(100)
+                            ->unique(ignoreRecord: true),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Pricing')
+                    ->schema([
+                        Forms\Components\TextInput::make('price')
+                            ->numeric()
+                            ->prefix('$')
+                            ->required(),
+                        
+                        Forms\Components\TextInput::make('sale_price')
+                            ->numeric()
+                            ->prefix('$'),
+                        
+                        Forms\Components\TextInput::make('cost_price')
+                            ->numeric()
+                            ->prefix('$'),
+                    ])->columns(3),
+
+                Forms\Components\Section::make('Inventory')
+                    ->schema([
+                        Forms\Components\TextInput::make('stock_quantity')
+                            ->numeric()
+                            ->default(0),
+                        
+                        Forms\Components\TextInput::make('weight')
+                            ->numeric()
+                            ->suffix('kg'),
+                        
+                        Forms\Components\TextInput::make('dimensions')
+                            ->maxLength(100),
+                    ])->columns(3),
+
+                Forms\Components\Section::make('Content')
+                    ->schema([
+                        Forms\Components\Textarea::make('short_description')
+                            ->maxLength(500)
+                            ->rows(3),
+                        
+                        Forms\Components\RichEditor::make('description')
+                            ->columnSpanFull(),
+                    ]),
+
+                Forms\Components\Section::make('Images')
+                    ->schema([
+                        Forms\Components\FileUpload::make('images')
+                            ->multiple()
+                            ->image()
+                            ->imageEditor()
+                            ->directory('products')
+                            ->maxFiles(5),
+                    ])->collapsible(),
+
+                Forms\Components\Section::make('SEO')
+                    ->schema([
+                        Forms\Components\TextInput::make('meta_title')
+                            ->maxLength(255),
+                        
+                        Forms\Components\Textarea::make('meta_description')
+                            ->maxLength(500)
+                            ->rows(3),
+                    ])->collapsible(),
+
+                Forms\Components\Section::make('Settings')
+                    ->schema([
+                        Forms\Components\Toggle::make('is_active')
+                            ->default(true),
+                        
+                        Forms\Components\Toggle::make('is_featured')
+                            ->default(false),
+                    ])->columns(2),
+            ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\ImageColumn::make('primaryImage.image_path')
+                    ->label('Image')
+                    ->circular()
+                    ->size(50),
+                
+                Tables\Columns\TextColumn::make('name')
+                    ->searchable()
+                    ->sortable(),
+                
+                Tables\Columns\TextColumn::make('category.name')
+                    ->sortable(),
+                
+                Tables\Columns\TextColumn::make('price')
+                    ->money('TWD')
+                    ->sortable(),
+                
+                Tables\Columns\TextColumn::make('stock_quantity')
+                    ->sortable(),
+                
+                Tables\Columns\IconColumn::make('is_active')
+                    ->boolean()
+                    ->sortable(),
+                
+                Tables\Columns\IconColumn::make('is_featured')
+                    ->boolean()
+                    ->sortable(),
+                
+                Tables\Columns\TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('category')
+                    ->relationship('category', 'name'),
+                
+                Tables\Filters\TernaryFilter::make('is_active'),
+                
+                Tables\Filters\TernaryFilter::make('is_featured'),
+            ])
+            ->actions([
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
+            ])
+            ->headerActions([
+                Tables\Actions\CreateAction::make(),
+            ]);
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListProducts::route('/'),
+            'create' => Pages\CreateProduct::route('/create'),
+            'view' => Pages\ViewProduct::route('/{record}'),
+            'edit' => Pages\EditProduct::route('/{record}/edit'),
+        ];
+    }
+}
+```
+
+#### Category Resource (v4 Syntax)
+```php
+<?php
+
+namespace App\Filament\Resources;
+
+use App\Filament\Resources\CategoryResource\Pages;
+use App\Models\Category;
+use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Table;
+use Illuminate\Support\Str;
+
+class CategoryResource extends Resource
+{
+    protected static ?string $model = Category::class;
+    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationGroup = 'Product Management';
+    protected static ?string $recordTitleAttribute = 'name';
+
+    public static function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Forms\Components\TextInput::make('name')
+                    ->required()
+                    ->maxLength(255)
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn ($state, $set) => $set('slug', Str::slug($state))),
+                
+                Forms\Components\TextInput::make('slug')
+                    ->required()
+                    ->maxLength(255)
+                    ->unique(ignoreRecord: true),
+                
+                Forms\Components\Select::make('parent_id')
+                    ->relationship('parent', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->placeholder('Select parent category (optional)'),
+                
+                Forms\Components\Textarea::make('description')
+                    ->maxLength(1000)
+                    ->rows(3),
+                
+                Forms\Components\TextInput::make('sort_order')
+                    ->numeric()
+                    ->default(0),
+                
+                Forms\Components\Toggle::make('is_active')
+                    ->default(true),
+                
+                Forms\Components\Section::make('SEO')
+                    ->schema([
+                        Forms\Components\TextInput::make('meta_title')
+                            ->maxLength(255),
+                        
+                        Forms\Components\Textarea::make('meta_description')
+                            ->maxLength(500)
+                            ->rows(3),
+                    ])->collapsible(),
+            ]);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->columns([
+                Tables\Columns\TextColumn::make('name')
+                    ->searchable()
+                    ->sortable(),
+                
+                Tables\Columns\TextColumn::make('parent.name')
+                    ->label('Parent Category')
+                    ->sortable(),
+                
+                Tables\Columns\TextColumn::make('products_count')
+                    ->counts('products')
+                    ->label('Products'),
+                
+                Tables\Columns\TextColumn::make('sort_order')
+                    ->sortable(),
+                
+                Tables\Columns\IconColumn::make('is_active')
+                    ->boolean()
+                    ->sortable(),
+                
+                Tables\Columns\TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+            ])
+            ->filters([
+                Tables\Filters\SelectFilter::make('parent')
+                    ->relationship('parent', 'name'),
+                
+                Tables\Filters\TernaryFilter::make('is_active'),
+            ])
+            ->actions([
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make(),
+                ]),
+            ])
+            ->headerActions([
+                Tables\Actions\CreateAction::make(),
+            ]);
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => Pages\ListCategories::route('/'),
+            'create' => Pages\CreateCategory::route('/create'),
+            'view' => Pages\ViewCategory::route('/{record}'),
+            'edit' => Pages\EditCategory::route('/{record}/edit'),
+        ];
+    }
+}
+```
+
+### 6.4 Infolists (v4 New Feature)
+
+#### Product Infolist
+```php
+<?php
+
+namespace App\Filament\Resources\ProductResource\Pages;
+
+use App\Filament\Resources\ProductResource;
+use Filament\Resources\Pages\ViewRecord;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
+
+class ViewProduct extends ViewRecord
+{
+    protected static string $resource = ProductResource::class;
+
+    public function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                Infolists\Components\Section::make('Basic Information')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('name')
+                            ->label('Product Name')
+                            ->size(Infolists\Components\TextEntry\TextEntrySize::Large)
+                            ->weight('bold'),
+                        
+                        Infolists\Components\TextEntry::make('slug')
+                            ->label('URL Slug'),
+                        
+                        Infolists\Components\TextEntry::make('category.name')
+                            ->label('Category'),
+                        
+                        Infolists\Components\TextEntry::make('sku')
+                            ->label('SKU'),
+                    ])->columns(2),
+
+                Infolists\Components\Section::make('Pricing')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('price')
+                            ->money('TWD'),
+                        
+                        Infolists\Components\TextEntry::make('sale_price')
+                            ->money('TWD'),
+                        
+                        Infolists\Components\TextEntry::make('cost_price')
+                            ->money('TWD'),
+                    ])->columns(3),
+
+                Infolists\Components\Section::make('Inventory')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('stock_quantity')
+                            ->label('Stock Quantity'),
+                        
+                        Infolists\Components\TextEntry::make('weight')
+                            ->suffix('kg'),
+                        
+                        Infolists\Components\TextEntry::make('dimensions')
+                            ->label('Dimensions'),
+                    ])->columns(3),
+
+                Infolists\Components\Section::make('Content')
+                    ->schema([
+                        Infolists\Components\TextEntry::make('short_description')
+                            ->label('Short Description'),
+                        
+                        Infolists\Components\TextEntry::make('description')
+                            ->label('Description')
+                            ->html(),
+                    ]),
+
+                Infolists\Components\Section::make('Settings')
+                    ->schema([
+                        Infolists\Components\IconEntry::make('is_active')
+                            ->label('Active Status')
+                            ->boolean(),
+                        
+                        Infolists\Components\IconEntry::make('is_featured')
+                            ->label('Featured Status')
+                            ->boolean(),
+                    ])->columns(2),
+            ]);
+    }
+}
+```
+
+### 6.5 Advanced v4 Features
+
+#### Custom Actions
+```php
+use Filament\Tables\Actions\Action;
+
+Action::make('duplicate')
+    ->label('Duplicate Product')
+    ->icon('heroicon-o-document-duplicate')
+    ->color('warning')
+    ->form([
+        Forms\Components\TextInput::make('name')
+            ->required()
+            ->label('New Product Name'),
+        Forms\Components\TextInput::make('sku')
+            ->required()
+            ->label('New SKU'),
+    ])
+    ->action(function (array $data, $record) {
+        $newProduct = $record->replicate();
+        $newProduct->name = $data['name'];
+        $newProduct->sku = $data['sku'];
+        $newProduct->save();
+        
+        return redirect()->route('filament.admin.resources.products.edit', $newProduct);
+    });
+```
+
+#### Bulk Actions
+```php
+use Filament\Tables\Actions\BulkAction;
+
+BulkAction::make('activate')
+    ->label('Activate Selected')
+    ->icon('heroicon-o-check-circle')
+    ->color('success')
+    ->action(function ($records) {
+        $records->each->update(['is_active' => true]);
+    })
+    ->requiresConfirmation();
+
+BulkAction::make('deactivate')
+    ->label('Deactivate Selected')
+    ->icon('heroicon-o-x-circle')
+    ->color('danger')
+    ->action(function ($records) {
+        $records->each->update(['is_active' => false]);
+    })
+    ->requiresConfirmation();
+```
+
+#### Custom Filters
+```php
+use Filament\Tables\Filters\Filter;
+
+Filter::make('price_range')
+    ->form([
+        Forms\Components\TextInput::make('min_price')
+            ->numeric()
+            ->label('Minimum Price'),
+        Forms\Components\TextInput::make('max_price')
+            ->numeric()
+            ->label('Maximum Price'),
+    ])
+    ->query(function ($query, array $data) {
+        return $query
+            ->when(
+                $data['min_price'],
+                fn ($query, $price) => $query->where('price', '>=', $price)
+            )
+            ->when(
+                $data['max_price'],
+                fn ($query, $price) => $query->where('price', '<=', $price)
+            );
+    });
+```
+
+### 6.6 Widgets
+
+#### Stats Overview Widget
+```php
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Models\Product;
+use App\Models\Order;
+use App\Models\Member;
+use Filament\Widgets\StatsOverviewWidget as BaseWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
+
+class StatsOverview extends BaseWidget
+{
+    protected function getStats(): array
+    {
+        return [
+            Stat::make('Total Products', Product::count())
+                ->description('Active products in store')
+                ->descriptionIcon('heroicon-m-shopping-bag')
+                ->color('success'),
+            
+            Stat::make('Total Orders', Order::count())
+                ->description('Orders this month')
+                ->descriptionIcon('heroicon-m-shopping-cart')
+                ->color('warning'),
+            
+            Stat::make('Total Members', Member::count())
+                ->description('Registered members')
+                ->descriptionIcon('heroicon-m-users')
+                ->color('info'),
+        ];
+    }
+}
+```
+
+### 6.7 Custom Pages
+
+#### Dashboard Page
+```php
+<?php
+
+namespace App\Filament\Pages;
+
+use Filament\Pages\Dashboard as BaseDashboard;
+
+class Dashboard extends BaseDashboard
+{
+    protected static ?string $navigationIcon = 'heroicon-o-home';
+    
+    protected static string $view = 'filament.pages.dashboard';
+    
+    public function getTitle(): string
+    {
+        return 'E-Commerce Dashboard';
+    }
+}
+```
+
+### 6.8 Configuration
+
+#### Panel Configuration
+```php
+<?php
+
+namespace App\Providers;
+
+use Filament\Panel;
+use Filament\PanelProvider;
+
+class AdminPanelProvider extends PanelProvider
+{
+    public function panel(Panel $panel): Panel
+    {
+        return $panel
+            ->default()
+            ->id('admin')
+            ->path('admin')
+            ->login()
+            ->colors([
+                'primary' => Color::Amber,
+            ])
+            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
+            ->pages([
+                Pages\Dashboard::class,
+            ])
+            ->plugins([
+                \BezhanSalleh\FilamentShield\FilamentShieldPlugin::class,
+            ])
+            ->middleware([
+                EncryptCookies::class,
+                AddQueuedCookiesToResponse::class,
+                StartSession::class,
+                AuthenticateSession::class,
+                ShareErrorsFromSession::class,
+                VerifyCsrfToken::class,
+                SubstituteBindings::class,
+                DisableBladeIconComponents::class,
+                DispatchServingFilamentEvent::class,
+            ])
+            ->authMiddleware([
+                Authenticate::class,
+            ]);
+    }
+}
+```
+
+---
+
+## 🚀 Implementation Steps
+
+### Step 1: Database Migrations
+```bash
+# Create migrations
+php artisan make:migration create_members_table
+php artisan make:migration create_categories_table
+php artisan make:migration create_products_table
+php artisan make:migration create_product_images_table
+php artisan make:migration create_cart_items_table
+php artisan make:migration create_orders_table
+php artisan make:migration create_order_items_table
+php artisan make:migration create_member_password_reset_tokens_table
+
+# Run migrations
+php artisan migrate
+```
+
+### Step 2: Models
+```bash
+# Create models
+php artisan make:model Member
+php artisan make:model Category
+php artisan make:model Product
+php artisan make:model ProductImage
+php artisan make:model CartItem
+php artisan make:model Order
+php artisan make:model OrderItem
+```
+
+### Step 3: Authentication
+```bash
+# Create member authentication controllers
+php artisan make:controller Auth/MemberLoginController
+php artisan make:controller Auth/MemberRegisterController
+php artisan make:controller Auth/MemberPasswordResetController
+```
+
+### Step 4: Filament Resources
+```bash
+# Create Filament resources
+php artisan make:filament-resource Product
+php artisan make:filament-resource Category
+php artisan make:filament-resource Order
+php artisan make:filament-resource Member
+```
+
+### Step 5: Frontend Controllers
+```bash
+# Create frontend controllers
+php artisan make:controller ProductController
+php artisan make:controller CartController
+php artisan make:controller CheckoutController
+php artisan make:controller OrderController
+```
+
+### Step 6: Services
+```bash
+# Create service classes
+php artisan make:service CartService
+php artisan make:service ECPayService
+php artisan make:service OrderService
+```
+
+---
+
+## 📁 File Structure
+
+```
+app/
+├── Http/
+│   ├── Controllers/
+│   │   ├── Auth/
+│   │   │   ├── MemberLoginController.php
+│   │   │   ├── MemberRegisterController.php
+│   │   │   └── MemberPasswordResetController.php
+│   │   ├── ProductController.php
+│   │   ├── CartController.php
+│   │   ├── CheckoutController.php
+│   │   └── OrderController.php
+│   └── Middleware/
+│       └── RedirectIfNotMember.php
+├── Models/
+│   ├── Member.php
+│   ├── Category.php
+│   ├── Product.php
+│   ├── ProductImage.php
+│   ├── CartItem.php
+│   ├── Order.php
+│   └── OrderItem.php
+├── Services/
+│   ├── CartService.php
+│   ├── ECPayService.php
+│   └── OrderService.php
+└── Filament/
+    └── Resources/
+        ├── ProductResource.php
+        ├── CategoryResource.php
+        ├── OrderResource.php
+        └── MemberResource.php
+
+config/
+├── auth.php (updated)
+└── ecpay.php (new)
+
+database/
+└── migrations/
+    ├── create_members_table.php
+    ├── create_categories_table.php
+    ├── create_products_table.php
+    ├── create_product_images_table.php
+    ├── create_cart_items_table.php
+    ├── create_orders_table.php
+    ├── create_order_items_table.php
+    └── create_member_password_reset_tokens_table.php
+
+resources/
+└── views/
+    ├── layouts/
+    │   ├── app.blade.php
+    │   └── guest.blade.php
+    ├── components/
+    │   ├── header.blade.php
+    │   ├── footer.blade.php
+    │   ├── product-card.blade.php
+    │   └── cart-summary.blade.php
+    └── pages/
+        ├── home.blade.php
+        ├── products/
+        ├── cart/
+        ├── auth/
+        └── orders/
+
+routes/
+├── web.php (updated)
+└── member.php (new)
+```
+
+---
+
+## 🔧 Configuration Files
+
+### ECPay Configuration (config/ecpay.php)
+```php
+<?php
+
+return [
+    'merchant_id' => env('ECPAY_MERCHANT_ID'),
+    'hash_key' => env('ECPAY_HASH_KEY'),
+    'hash_iv' => env('ECPAY_HASH_IV'),
+    'production' => env('ECPAY_PRODUCTION', false),
+];
+```
+
+### Environment Variables (.env)
+```env
+# ECPay Configuration
+ECPAY_MERCHANT_ID=your_merchant_id
+ECPAY_HASH_KEY=your_hash_key
+ECPAY_HASH_IV=your_hash_iv
+ECPAY_PRODUCTION=false
+
+# Authentication
+AUTH_GUARD=web
+```
+
+---
+
+## 🧪 Testing Strategy
+
+### Unit Tests
+- Model relationships and scopes
+- Service class methods
+- Payment integration logic
+
+### Feature Tests
+- Authentication flows
+- Shopping cart functionality
+- Checkout process
+- Payment processing
+
+### Browser Tests
+- User registration and login
+- Product browsing and search
+- Cart management
+- Checkout completion
+
+---
+
+## 📊 Performance Considerations
+
+### Database Optimization
+- Indexes on frequently queried columns
+- Eager loading for relationships
+- Query optimization for product listings
+
+### Caching Strategy
+- Product category cache
+- Product search results cache
+- Cart session management
+
+### Frontend Optimization
+- Image optimization and lazy loading
+- CSS/JS minification
+- CDN for static assets
+
+---
+
+## 🔒 Security Measures
+
+### Authentication Security
+- CSRF protection
+- Rate limiting on login attempts
+- Password strength requirements
+- Session security
+
+### Payment Security
+- Payment data encryption
+- Secure communication with ECPay
+- Transaction verification
+- Fraud detection
+
+### Data Protection
+- Input validation and sanitization
+- SQL injection prevention
+- XSS protection
+- File upload security
+
+---
+
+## 📈 Monitoring & Analytics
+
+### Application Monitoring
+- Error logging and tracking
+- Performance monitoring
+- User behavior analytics
+- Payment success/failure tracking
+
+### Business Metrics
+- Sales reports
+- Product performance
+- Customer analytics
+- Inventory management
+
+---
+
+This development plan provides a comprehensive roadmap for building your e-commerce system with Laravel 12 and Filament v4. Each phase builds upon the previous one, ensuring a solid foundation for your application.
