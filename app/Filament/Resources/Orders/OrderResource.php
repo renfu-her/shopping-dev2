@@ -13,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class OrderResource extends Resource
 {
@@ -23,6 +24,7 @@ class OrderResource extends Resource
     protected static ?string $recordTitleAttribute = 'order_number';
 
     protected static ?int $navigationSort = 4;
+    protected static string|UnitEnum|null $navigationGroup = 'Order Management';
 
     public static function form(Schema $schema): Schema
     {
@@ -37,7 +39,7 @@ class OrderResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            \App\Filament\Resources\Orders\RelationManagers\OrderItemsRelationManager::class,
         ];
     }
 
