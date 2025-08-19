@@ -1,9 +1,18 @@
 @extends('layouts.app')
 
-@section('title', 'All Products - E-Commerce Store')
+@section('title', isset($category) ? $category->name . ' - E-Commerce Store' : 'All Products - E-Commerce Store')
 
 @section('content')
 <div class="container">
+    @if(isset($category))
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
+                <li class="breadcrumb-item"><a href="{{ route('products.index') }}">Products</a></li>
+                <li class="breadcrumb-item active" aria-current="page">{{ $category->name }}</li>
+            </ol>
+        </nav>
+    @endif
     <div class="row">
         <!-- Sidebar Filters -->
         <div class="col-lg-3">
@@ -12,15 +21,15 @@
                     <h5 class="mb-0">Filters</h5>
                 </div>
                 <div class="card-body">
-                    <form method="GET" action="{{ route('products.index') }}">
+                    <form method="GET" action="{{ isset($category) ? route('products.category', $category->slug) : route('products.index') }}">
                         <!-- Category Filter -->
                         <div class="mb-3">
                             <label class="form-label">Category</label>
                             <select name="category" class="form-select">
                                 <option value="">All Categories</option>
-                                @foreach(App\Models\Category::active()->root()->get() as $category)
-                                    <option value="{{ $category->id }}" {{ request('category') == $category->id ? 'selected' : '' }}>
-                                        {{ $category->name }}
+                                @foreach(App\Models\Category::active()->root()->get() as $cat)
+                                    <option value="{{ $cat->id }}" {{ (isset($category) && $category->id == $cat->id) || (request('category') == $cat->id) ? 'selected' : '' }}>
+                                        {{ $cat->name }}
                                     </option>
                                 @endforeach
                             </select>
@@ -69,7 +78,7 @@
             <!-- Search and Results Info -->
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <div>
-                    <h2>All Products</h2>
+                    <h2>{{ isset($category) ? $category->name : 'All Products' }}</h2>
                     <p class="text-muted mb-0">{{ $products->total() }} products found</p>
                 </div>
                 <div class="d-flex align-items-center">
