@@ -34,7 +34,7 @@
                                 <i class="fas fa-tag fa-3x text-primary mb-3"></i>
                                 <h5 class="card-title">{{ $category->name }}</h5>
                                 <p class="card-text text-muted">{{ Str::limit($category->description, 100) }}</p>
-                                <a href="{{ route('products.category', $category->slug) }}" class="btn btn-outline-primary">
+                                <a href="{{ route('products.index', ['category' => $category->id]) }}" class="btn btn-outline-primary">
                                     View Products
                                 </a>
                             </div>

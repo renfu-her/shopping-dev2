@@ -59,6 +59,7 @@ class ProductController extends Controller
 
     public function category(Category $category)
     {
+        
         $products = $category->products()
             ->active()
             ->with(['primaryImage'])

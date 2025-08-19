@@ -28,8 +28,8 @@
                             <select name="category" class="form-select">
                                 <option value="">All Categories</option>
                                 @foreach(App\Models\Category::active()->root()->get() as $cat)
-                                    
-                                    <option value="{{ $cat->id }}" @if(!empty(request('category'))){{  (request('category') == $cat->id) ? 'selected' : '' }} @endif>
+                                    <option value="{{ $cat->id }}" 
+                                        @if(!empty(request('category'))){{  (request('category') == $cat->id) ? 'selected' : '' }} @endif>
                                         {{ $cat->name }}
                                     </option>
                                 @endforeach

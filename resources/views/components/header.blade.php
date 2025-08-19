@@ -20,7 +20,7 @@
                     </a>
                     <ul class="dropdown-menu">
                         @foreach(App\Models\Category::active()->root()->get() as $category)
-                            <li><a class="dropdown-item" href="{{ route('products.category', $category->slug) }}">{{ $category->name }}</a></li>
+                            <li><a class="dropdown-item" href="{{ route('products.index', ['category' => $category->id]) }}">{{ $category->name }}</a></li>
                         @endforeach
                     </ul>
                 </li>
