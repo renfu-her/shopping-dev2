@@ -53,5 +53,9 @@ Route::middleware('auth:member')->group(function () {
 });
 
 // Payment callback routes (no CSRF protection)
-Route::post('/payment/result', [CheckoutController::class, 'paymentResult'])->name('payment.result');
-Route::post('/payment/notify', [CheckoutController::class, 'paymentNotify'])->name('payment.notify');
+Route::post('/payment/result', [CheckoutController::class, 'paymentResult'])
+    ->name('payment.result')
+    ->middleware('restore.member.session');
+Route::post('/payment/notify', [CheckoutController::class, 'paymentNotify'])
+    ->name('payment.notify')
+    ->middleware('restore.member.session');

@@ -188,6 +188,13 @@ class CheckoutController extends Controller
         // Store payment data in session for redirect
         session(['ecpay_payment_data' => $data]);
         session(['ecpay_payment_url' => $baseUrl]);
+        
+        // Store member authentication info to maintain login state
+        session(['member_id' => auth()->guard('member')->id()]);
+        session(['member_email' => auth()->guard('member')->user()->email]);
+        
+        // Regenerate session ID for security
+        session()->regenerate();
 
         return ['success' => true, 'message' => 'Redirecting to payment gateway', 'redirect' => true];
     }
@@ -284,6 +291,14 @@ class CheckoutController extends Controller
 
         if (!$order) {
             return response()->json(['status' => 'error', 'message' => 'Order not found']);
+        }
+
+        // Restore member authentication if needed
+        if (!auth()->guard('member')->check() && session('member_id')) {
+            $member = \App\Models\Member::find(session('member_id'));
+            if ($member) {
+                auth()->guard('member')->login($member);
+            }
         }
 
         // Update order based on payment result
