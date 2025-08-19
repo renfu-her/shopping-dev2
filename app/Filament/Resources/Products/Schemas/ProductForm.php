@@ -52,7 +52,7 @@ class ProductForm
                             ->maxLength(500)
                             ->rows(3)
                             ->helperText('Brief description for product listings'),
-                    ])->columns(2),
+                    ])->columns(2)->columnSpanFull(),
 
                 Section::make('Pricing')
                     ->schema([
@@ -76,7 +76,7 @@ class ProductForm
                             ->prefix('$')
                             ->minValue(0)
                             ->helperText('Internal cost for profit calculations'),
-                    ])->columns(3),
+                    ])->columns(3)->columnSpanFull(),
 
                 Section::make('Inventory')
                     ->schema([
@@ -96,7 +96,7 @@ class ProductForm
                             ->label('Dimensions')
                             ->maxLength(100)
                             ->helperText('e.g., 10x5x2 cm'),
-                    ])->columns(3),
+                    ])->columns(3)->columnSpanFull(),
 
                 Section::make('Content')
                     ->schema([
@@ -116,19 +116,7 @@ class ProductForm
                                 'blockquote',
                                 'codeBlock',
                             ]),
-                    ])->collapsible(),
-
-                Section::make('Images')
-                    ->schema([
-                        FileUpload::make('images')
-                            ->label('Product Images')
-                            ->multiple()
-                            ->image()
-                            ->imageEditor()
-                            ->directory('products')
-                            ->maxFiles(5)
-                            ->helperText('Upload up to 5 product images'),
-                    ])->collapsible(),
+                    ])->collapsible()->columnSpanFull(),
 
                 Section::make('SEO')
                     ->schema([
@@ -142,7 +130,7 @@ class ProductForm
                             ->maxLength(500)
                             ->rows(3)
                             ->helperText('Description for search engines'),
-                    ])->collapsible(),
+                    ])->collapsible()->columnSpanFull(),
 
                 Section::make('Settings')
                     ->schema([
@@ -155,7 +143,7 @@ class ProductForm
                             ->label('Featured Product')
                             ->default(false)
                             ->helperText('Featured products appear on homepage'),
-                    ])->columns(2),
+                    ])->columns(2)->columnSpanFull(),
             ]);
     }
 }

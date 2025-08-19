@@ -28,6 +28,10 @@ class Product extends Model
         'meta_description',
     ];
 
+    protected $appends = [
+        'display_image',
+    ];
+
     protected $casts = [
         'price' => 'decimal:2',
         'sale_price' => 'decimal:2',
@@ -76,5 +80,22 @@ class Product extends Model
             return round((($this->price - $this->sale_price) / $this->price) * 100);
         }
         return 0;
+    }
+
+    public function getDisplayImageAttribute()
+    {
+        // First try to get the primary image
+        $primaryImage = $this->primaryImage;
+        if ($primaryImage) {
+            return $primaryImage->image_path;
+        }
+        
+        // If no primary image, get the first image
+        $firstImage = $this->images()->first();
+        if ($firstImage) {
+            return $firstImage->image_path;
+        }
+        
+        return null;
     }
 }

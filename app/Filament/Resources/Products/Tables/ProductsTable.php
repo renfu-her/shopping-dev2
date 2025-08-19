@@ -19,10 +19,9 @@ class ProductsTable
     {
         return $table
             ->columns([
-                ImageColumn::make('primaryImage.image_path')
+                ImageColumn::make('display_image')
                     ->label('Image')
-                    ->circular()
-                    ->size(50)
+                    ->disk('public')
                     ->placeholder('No Image'),
                 
                 TextColumn::make('name')
