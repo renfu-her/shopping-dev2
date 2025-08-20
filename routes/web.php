@@ -59,3 +59,6 @@ Route::post('/payment/result', [CheckoutController::class, 'paymentResult'])
 Route::post('/payment/notify', [CheckoutController::class, 'paymentNotify'])
     ->name('payment.notify')
     ->middleware('restore.member.session');
+
+// Sitemap route
+Route::get('/sitemap.xml', [App\Http\Controllers\SitemapController::class, 'index']);
